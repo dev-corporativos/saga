@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 import { config } from '../config'
-import { Pedido } from '../services/pedido.service'
+import { Pagamento } from '../services/pagamento.service'
 
 export const pool = new Pool({
   host: config.database.host,
