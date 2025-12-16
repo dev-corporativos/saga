@@ -1,39 +1,4 @@
 services:
-  pedido-service:
-    build:
-      context: ./pedido-service
-      dockerfile: Dockerfile
-    container_name: pedido-service
-    ports:
-      - "3001:3001"
-    depends_on:
-      - pedido-db
-      - rabbitmq
-    environment:
-      SERVICE_NAME: pedido-service
-      SERVICE_PORT: 3001
-
-      DB_HOST: pedido-db
-      DB_PORT: 5432
-      DB_USER: pedidouser
-      DB_PASS: pedidopass
-      DB_NAME: pedidodb
-
-      RABBITMQ_URL: amqp://rabbitmq:5672
-    restart: always
-
-  pedido-db:
-    image: postgres:17-alpine
-    container_name: pedido-db
-    environment:
-      POSTGRES_USER: pedidouser
-      POSTGRES_PASSWORD: pedidopass
-      POSTGRES_DB: pedidodb
-    ports:
-      - "5433:5432"
-    volumes:
-      - pedido-db-data:/var/lib/postgresql/data
-
   pagamento-service:
     build:
       context: ./pagamento-service
@@ -78,4 +43,4 @@ services:
       - "15672:15672"
 
 volumes:
-  pedido-db-data:
+  pagamento-db-data:
