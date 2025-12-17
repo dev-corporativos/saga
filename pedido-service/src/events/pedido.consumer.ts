@@ -1,10 +1,8 @@
 import { getChannel } from "../messaging/rabbitmq"
 import { updatePedidoStatus } from "../services/pedido.service"
 
-const channel = getChannel()
-
 export const listenToPagamentoEvents = async (): Promise<void> => {
-  await channel.consume('pedido.compensation', async (msg: any) => {
+  await getChannel().consume('pedido.compensation', async (msg: any) => {
     if (!msg) return
 
     try {
@@ -28,16 +26,16 @@ export const listenToPagamentoEvents = async (): Promise<void> => {
         }
       }
 
-      channel.ack(msg)
+      getChannel().ack(msg)
     } catch (error) {
       console.error('[Pedido Service] Erro ao processar evento de pagamento:', error)
-      channel.nack(msg, false, true)
+      getChannel().nack(msg, false, true)
     }
   })
 }
 
 export const listenToEntregaEvents = async (): Promise<void> => {
-  await channel.consume('pedido.events', async (msg: any) => {
+  await getChannel().consume('pedido.events', async (msg: any) => {
     if (!msg) return
 
     try {
@@ -52,17 +50,17 @@ export const listenToEntregaEvents = async (): Promise<void> => {
         }
       }
 
-      channel.ack(msg)
+      getChannel().ack(msg)
     } catch (error) {
       console.error('[Pedido Service] Erro ao processar evento de entrega:', error)
-      channel.nack(msg, false, true)
+      getChannel().nack(msg, false, true)
     }
   })
 }
 
 export const publishEvent = async (event: any): Promise<void> => {
   try {
-    channel.publish(
+    getChannel().publish(
       'saga.events',
       '',
       Buffer.from(JSON.stringify(event)),

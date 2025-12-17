@@ -1,15 +1,8 @@
 import { initializeDatabase } from "./database"
 import { initializeRabbitMQ } from "./messaging/rabbitmq"
-import express, { Express } from "express"
 import { config } from "./config"
-import { start } from "node:repl"
 import { getChannel, getConnection } from "./messaging/rabbitmq"
-
-const app: Express = express()
-app.use(express.json())
-
-const channel = getChannel()
-const connection = getConnection()
+import { app } from "./controllers/pedido.controller"
 
 const startServer = async () => {
   try {
@@ -29,7 +22,7 @@ startServer()
 
 process.on('SIGINT', async () => {
   console.log('[Pedido Service] Encerrando o serviço...')
-  if (channel) await channel.close()
-  if (connection) await connection.close()
+  if (getChannel()) await getChannel().close()
+  if (getConnection()) await getConnection().close()
   process.exit(0)
 })

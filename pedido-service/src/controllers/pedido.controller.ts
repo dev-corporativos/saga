@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { createPedido, getAllPedidos } from '../services/pedido.service'
 import { publishEvent } from '../events/pedido.consumer'
 
-const app: Express = express()
+export const app: Express = express()
 app.use(express.json())
 
 interface PedidoCreatedEvent {
