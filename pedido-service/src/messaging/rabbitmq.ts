@@ -29,14 +29,14 @@ export const initializeRabbitMQ = async (): Promise<void> => {
   }
 }
 
-export const getChannel = async (): Promise<amqp.Channel> => {
+export const getChannel = (): amqp.Channel => {
   if (!channel) {
     throw new Error('[Pedido Service] RabbitMQ não inicializado.')
   }
   return channel
 }
 
-export const getConnection = async (): Promise<amqp.Channel> => {
+export const getConnection = (): amqp.Channel => {
   if (!connection) {
     throw new Error('[Pedido Service] RabbitMQ não inicializado.')
   }

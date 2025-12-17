@@ -8,8 +8,8 @@ import { getChannel, getConnection } from "./messaging/rabbitmq"
 const app: Express = express()
 app.use(express.json())
 
-const channel = await getChannel()
-const connection = await getConnection()
+const channel = getChannel()
+const connection = getConnection()
 
 const startServer = async () => {
   try {

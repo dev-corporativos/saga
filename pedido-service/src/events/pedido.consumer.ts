@@ -1,7 +1,7 @@
 import { getChannel } from "../messaging/rabbitmq"
 import { updatePedidoStatus } from "../services/pedido.service"
 
-const channel = await getChannel()
+const channel = getChannel()
 
 export const listenToPagamentoEvents = async (): Promise<void> => {
   await channel.consume('pedido.compensation', async (msg: any) => {
