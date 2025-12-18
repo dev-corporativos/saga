@@ -1,9 +1,11 @@
 import { getChannel } from "../messaging/rabbitmq";
 import { updatePagamentoStatus } from "../services/pagamento.service";
+import { v4 as uuidv4 } from "uuid";
+import { createPagamento } from "../services/pagamento.service";
 
 const pedidosProcessados = new Set<string>();
 
-export const listenToPedidosEvents = async (): Promise<void> => {
+export const listenToPedidoEvents = async (): Promise<void> => {
   await getChannel().consume("pagamento.events", async (msg: any) => {
     if (!msg) return;
 
@@ -21,32 +23,37 @@ export const listenToPedidosEvents = async (): Promise<void> => {
 
         pedidosProcessados.add(event.pedidoId);
 
+        const pagamentoId = uuidv4();
+
+        await createPagamento({
+          id: pagamentoId,
+          pedidoId: event.pedidoId,
+          valor: event.valor,
+          status: "PENDENTE",
+        })
+
         // 80% de chance de sucesso no pagamento
         const sucessoPagamento = Math.random() > 0.2;
 
         if (sucessoPagamento) {
-          await updatePagamentoStatus(event.pagamentoId, "APROVADO");
-          console.log(
-            `[Pagamento Service] Pagamento ${event.pagamentoId} aprovado para o pedido ${event.pedidoId}.`
-          );
+          await updatePagamentoStatus(pagamentoId, "CONCLUIDO");
+          console.log(`[Pagamento Service] Pagamento ${pagamentoId} aprovado para o pedido ${event.pedidoId}.`);
 
           await publishEvent({
-            type: "PagamentoAprovado",
-            pagamentoId: event.pagamentoId,
+            type: "PagamentoConcluido",
+            pagamentoId,
             pedidoId: event.pedidoId,
-            status: "APROVADO",
+            status: "CONCLUIDO",
             valor: event.valor,
             timestamp: new Date().toISOString(),
           });
         } else {
-          await updatePagamentoStatus(event.pagamentoId, "CANCELADO");
-          console.log(
-            `[Pagamento Service] Pagamento ${event.pagamentoId} cancelado para o pedido ${event.pedidoId}.`
-          );
+          await updatePagamentoStatus(pagamentoId, "CANCELADO");
+          console.log(`[Pagamento Service] Pagamento ${pagamentoId} cancelado para o pedido ${event.pedidoId}.`);
 
           await publishEvent({
             type: "PagamentoCancelado",
-            pagamentoId: event.pagamentoId,
+            pagamentoId,
             pedidoId: event.pedidoId,
             status: "CANCELADO",
             valor: event.valor,
@@ -57,7 +64,7 @@ export const listenToPedidosEvents = async (): Promise<void> => {
 
       getChannel().ack(msg);
     } catch (error) {
-      console.error("[Pagamento Service] Erro ao processar evento de entrega:", error);
+      console.error("[Pagamento Service] Erro ao processar evento de pedido:", error);
       getChannel().nack(msg, false, true);
     }
   });
