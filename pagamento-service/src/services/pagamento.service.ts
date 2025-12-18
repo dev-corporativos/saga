@@ -1,66 +1,74 @@
-import { v4 as uuidv4 } from "uuid"
-import { pool } from "../database"
-import { getChannel } from "../messaging/rabbitmq"
+import { pool } from "../database";
 
 export interface Pagamento {
-  id: string
-  pedido_id: string
-  valor: number
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED'
-  created_at: Date
-  updated_at: Date
+  id: string;
+  pedido_id: string;
+  valor: number;
+  metodo: string;
+  status: "PENDENTE" | "COMPLETADO" | "CANCELADO";
+  created_at: Date;
+  updated_at: Date;
 }
 
-export const createPagamento = async (pagamento: Omit<Pagamento, 'id' | 'created_at' | 'updated_at'>): Promise<Pagamento> => {
-  const id = uuidv4()
-
+export const createPagamento = async (
+  pagamento: Omit<Pagamento, "created_at" | "updated_at">
+): Promise<Pagamento> => {
   const query = `
-    INSERT INTO pagamentos (id, pedido_id, valor, status)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO pagamento (id, pedido_id, valor, metodo, status)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING *;
   `;
 
   const result = await pool.query(query, [
-    id,
+    pagamento.id,
     pagamento.pedido_id,
     pagamento.valor,
-    'PENDING',
+    pagamento.metodo,
+    "PENDENTE",
   ]);
 
-  getChannel().publish(
-    'saga.events',
-    '',
-    Buffer.from(
-      JSON.stringify({
-        event: 'PagamentoCreated',
-        data: {
-          id,
-          pedido_id: pagamento.pedido_id,
-          valor: pagamento.valor,
-          status: 'PENDING',
-          timestamp: new Date().toISOString(),
-        },
-      })
-    )
-  )
+  return mapDbPagamento(result.rows[0]);
+};
 
-  console.log(`PagamentoCreated event published for pedido ID: ${id}`)
+export const updatePagamentoStatus = async (
+  pagamentoId: string,
+  status: string
+): Promise<Pagamento | null> => {
+  const query = `
+    UPDATE pagamento
+    SET status = $1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+    RETURNING *;
+  `;
+
+  const result = await pool.query(query, [status, pagamentoId]);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
 
   return mapDbPagamento(result.rows[0]);
-}
+};
+
+export const getAllPagamentos = async (): Promise<Pagamento[]> => {
+  const query = `SELECT * FROM pagamento ORDER BY created_at DESC;`;
+  const result = await pool.query(query);
+  return result.rows.map(mapDbPagamento);
+};
 
 export async function cancelPagamento(pagamentoId: string) {
   await pool.query(
-    'UPDATE pagamentos SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-    ['CANCELLED', pagamentoId]
-  )
+    "UPDATE pagamento SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+    ["CANCELLED", pagamentoId]
+  );
 }
 
 const mapDbPagamento = (dbPagamento: any): Pagamento => ({
   id: dbPagamento.id,
   pedido_id: dbPagamento.pedido_id,
-  valor: dbPagamento.valor,
+  valor: parseFloat(dbPagamento.valor),
+  metodo: dbPagamento.metodo,
   status: dbPagamento.status,
   created_at: new Date(dbPagamento.created_at),
   updated_at: new Date(dbPagamento.updated_at),
-})
+});
