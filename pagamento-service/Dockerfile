@@ -5,7 +5,8 @@ WORKDIR /app
 # Copia dependências
 COPY package*.json ./
 
-RUN npm install
+RUN npm install && \
+    npm install -g typescript ts-node
 
 # Copia o código
 COPY . .
