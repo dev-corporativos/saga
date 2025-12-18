@@ -1,6 +1,6 @@
 import * as amqp from "amqplib";
 import { config } from "../config";
-import { listenToPedidosEvents } from "../events/pagamento.consumer";
+import { listenToPedidoEvents } from "../events/pagamento.consumer";
 
 let channel: any;
 let connection: any;
@@ -8,8 +8,7 @@ let connection: any;
 export const initializeRabbitMQ = async (): Promise<void> => {
   try {
     connection = await amqp.connect(config.rabbitmq.url);
-    const ch = await connection.createChannel();
-    channel = ch as unknown as amqp.Channel;
+    channel = await connection.createChannel();
 
     await channel.assertExchange("saga.events", "fanout", { durable: true });
 
@@ -19,7 +18,7 @@ export const initializeRabbitMQ = async (): Promise<void> => {
 
     console.log("[Pagamento Service] RabbitMQ conectado.");
 
-    listenToPedidosEvents();
+    listenToPedidoEvents();
   } catch (error) {
     console.error("[Pagamento Service] Erro ao conectar ao RabbitMQ:", error);
     setTimeout(initializeRabbitMQ, 5000);
