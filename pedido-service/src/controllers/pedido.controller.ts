@@ -11,6 +11,7 @@ interface PedidoCreatedEvent {
   produto: string,
   quantidade: number,
   valor: number,
+  status: string,
   timestamp: string,
 }
 
@@ -37,6 +38,7 @@ app.post('/pedidos', async (req: Request, res: Response) => {
       produto,
       quantidade,
       valor,
+      status: pedido.status,
       timestamp: new Date().toISOString(),
     }
 

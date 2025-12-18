@@ -18,6 +18,7 @@ export const listenToPagamentoEvents = async (): Promise<void> => {
           await publishEvent({
             type: 'PedidoCancelado',
             pedidoId: event.pedidoId,
+            status: event.status,
             timestamp: new Date().toISOString(),
           })
         } else if (event.type === 'PagamentoConcluido' && event.status === 'CONCLUIDO') {
