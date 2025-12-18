@@ -6,7 +6,7 @@ export const pool = new Pool({
   port: config.database.port,
   user: config.database.user,
   password: config.database.password,
-  database: config.database.name,
+  database: config.database.database,
 });
 
 export const initializeDatabase = async (): Promise<void> => {
@@ -15,19 +15,18 @@ export const initializeDatabase = async (): Promise<void> => {
       CREATE TABLE IF NOT EXISTS pagamento (
         id VARCHAR(36) PRIMARY KEY,
         pedido_id VARCHAR(36) NOT NULL UNIQUE,
-        valor DECIMAL(10,2) NOT NULL,
-        metodo VARCHAR(50) NOT NULL,
+        valor DECIMAL(10, 2) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'PENDENTE',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE INDEX IF NOT EXISTS idx_pagamentos_status ON pagamentos(status);
-      CREATE INDEX IF NOT EXISTS idx_pagamentos_pedidos ON pagamentos(pedido_id);
+      CREATE INDEX IF NOT EXISTS idx_pagamento_status ON pagamento(status);
+      CREATE INDEX IF NOT EXISTS idx_pagamento_pedido ON pagamento(pedido_id);
     `);
-    console.log("Banco de dados de Pagamento Service inicializado.");
+    console.log("Banco de dados do Pagamento Service inicializado.");
   } catch (error) {
-    console.error("Erro ao inicializar o banco de dados:", error);
+    console.error("Erro ao inicializar o banco de dados do Pagamento Service:", error);
     throw error;
   }
 };
