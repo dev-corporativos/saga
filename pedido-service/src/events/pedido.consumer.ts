@@ -8,10 +8,10 @@ export const listenToPagamentoEvents = async (): Promise<void> => {
     try {
       const event = JSON.parse(msg.content.toString())
 
-      if (event.type === 'PagamentoFalhado' || event.type === 'PagamentoProcessado') {
+      if (event.type === 'PagamentoCancelado' || event.type === 'PagamentoConcluido') {
         console.log('[Pedido Service] Evento de pagamento recebido:', event)
 
-        if (event.type === 'PagamentoFalhado') {
+        if (event.type === 'PagamentoCancelado') {
           await updatePedidoStatus(event.pedidoId, 'CANCELADO')
           console.log(`[Pedido Service] Pedido ${event.pedidoId} cancelado devido a falha no pagamento.`)
 
@@ -20,7 +20,7 @@ export const listenToPagamentoEvents = async (): Promise<void> => {
             pedidoId: event.pedidoId,
             timestamp: new Date().toISOString(),
           })
-        } else if (event.type === 'PagamentoProcessado' && event.status === 'CONCLUIDO') {
+        } else if (event.type === 'PagamentoConcluido' && event.status === 'CONCLUIDO') {
           await updatePedidoStatus(event.pedidoId, 'ENVIADO')
           console.log(`[Pedido Service] Pedido ${event.pedidoId} atualizado para ENVIADO.`)
         }

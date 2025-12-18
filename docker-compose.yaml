@@ -1,4 +1,16 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - saga-networks
+
   pedido-service:
     build:
       context: ./pedido-service
@@ -12,14 +24,15 @@ services:
     environment:
       SERVICE_NAME: pedido-service
       SERVICE_PORT: 3001
-
       DB_HOST: pedido-db
       DB_PORT: 5432
       DB_USER: pedidouser
       DB_PASS: pedidopass
       DB_NAME: pedidodb
-      RABBITMQ_URL: amqp://rabbitmq:5672
-    restart: always
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - saga-networks
+    restart: unless-stopped
 
   pedido-db:
     image: postgres:17-alpine
@@ -32,14 +45,50 @@ services:
       - "5433:5432"
     volumes:
       - pedido-db-data:/var/lib/postgresql/data
+    networks:
+      - saga-networks
 
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
+  pagamento-service:
+    build:
+      context: ./pagamento-service
+      dockerfile: Dockerfile
+    container_name: pagamento-service
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "3002:3002"
+    depends_on:
+      - pagamento-db
+      - rabbitmq
+    environment:
+      SERVICE_NAME: pagamento-service
+      SERVICE_PORT: 3002
+      DB_HOST: pagamento-db
+      DB_PORT: 5432
+      DB_USER: pagamentouser
+      DB_PASS: pagamentopass
+      DB_NAME: pagamentodb
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - saga-networks
+    restart: unless-stopped
+
+  pagamento-db:
+    image: postgres:17-alpine
+    container_name: pagamento-db
+    environment:
+      POSTGRES_USER: pagamentouser
+      POSTGRES_PASSWORD: pagamentopass
+      POSTGRES_DB: pagamentodb
+    ports:
+      - "5434:5432"
+    volumes:
+      - pagamento-db-data:/var/lib/postgresql/data
+    networks:
+      - saga-networks
 
 volumes:
   pedido-db-data:
+  pagamento-db-data:
+
+networks:
+  saga-networks:
+    driver: bridge

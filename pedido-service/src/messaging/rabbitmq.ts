@@ -25,6 +25,7 @@ export const initializeRabbitMQ = async (): Promise<void> => {
     listenToEntregaEvents()
   } catch (error) {
     console.error('[Pedido Service] Erro ao conectar ao RabbitMQ:', error)
+    setTimeout(initializeRabbitMQ, 5000)
     throw error
   }
 }
