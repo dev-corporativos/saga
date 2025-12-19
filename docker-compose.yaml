@@ -85,9 +85,47 @@ services:
     networks:
       - saga-networks
 
+  entrega-service:
+    build:
+      context: ./entrega-service
+      dockerfile: Dockerfile
+    container_name: entrega-service
+    ports:
+      - "3003:3003"
+    depends_on:
+      - entrega-db
+      - rabbitmq
+    environment:
+      SERVICE_NAME: entrega-service
+      SERVICE_PORT: 3003
+      DB_HOST: entrega-db
+      DB_PORT: 5432
+      DB_USER: entregauser
+      DB_PASS: entregapass
+      DB_NAME: entregadb
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    networks:
+      - saga-networks
+    restart: unless-stopped
+
+  entrega-db:
+    image: postgres:17-alpine
+    container_name: entrega-db
+    environment:
+      POSTGRES_USER: entregauser
+      POSTGRES_PASSWORD: entregapass
+      POSTGRES_DB: entregadb
+    ports:
+      - "5435:5432"
+    volumes:
+      - entrega-db-data:/var/lib/postgresql/data
+    networks:
+      - saga-networks
+
 volumes:
   pedido-db-data:
   pagamento-db-data:
+  entrega-db-data:
 
 networks:
   saga-networks:
