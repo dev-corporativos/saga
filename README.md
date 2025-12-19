@@ -8,6 +8,11 @@ Este projeto demonstra uma arquitetura de microserviços utilizando o padrão SA
 - **Desafio:** Coordenar estados entre serviços independentes sem transações distribuídas (2PC), adotando comunicação assíncrona via eventos e compensações em caso de falhas.
 - **Objetivo:** Implementar uma SAGA coreografada com RabbitMQ, onde cada serviço reage a eventos e executa ações (e compensações) para manter o sistema consistente.
 
+### Problema Simulado
+- O **pagamento tem 80% de chance de sucesso** (20% de falha)
+- Quando o pagamento falha, é necessário **reverter** (compensar) o pedido criado
+- Quando o pagamento é bem-sucedido, a entrega deve ser processada
+- Todo o fluxo deve ser **consistente** e **rastreável**
 
 ## **Arquitetura da Solução**
 - **Estilo:** Microserviços + SAGA coreografada (event-driven)
@@ -15,6 +20,37 @@ Este projeto demonstra uma arquitetura de microserviços utilizando o padrão SA
 - **Persistência:** Um banco PostgreSQL por serviço (isolamento de dados)
 
 ![Arquitetura](diagrama.png)
+
+### Componentes
+
+#### 1. **Serviço de Pedidos** (porta 3001)
+- **Responsabilidade**: Gerenciar o ciclo de vida dos pedidos
+- **Banco de Dados**: PostgreSQL (porta 5433)
+- **Endpoints**:
+  - `POST /pedidos` - Criar novo pedido
+  - `GET /pedidos` - Listar todos os pedidos
+- **Estados**: PENDENTE → ENVIADO → ENTREGUE / CANCELADO
+
+#### 2. **Serviço de Pagamentos** (porta 3002)
+- **Responsabilidade**: Processar pagamentos com 80% de taxa de sucesso
+- **Banco de Dados**: PostgreSQL (porta 5434)
+- **Estados**: PENDENTE → CONCLUIDO / CANCELADO
+
+#### 3. **Serviço de Entregas** (porta 3003)
+- **Responsabilidade**: Gerenciar entregas baseado no status do pagamento
+- **Banco de Dados**: PostgreSQL (porta 5435)
+- **Estados**: PENDENTE → ENTREGUE / CANCELADO
+
+#### 4. **RabbitMQ** (portas 5672, 15672)
+- **Responsabilidade**: Message broker para comunicação assíncrona entre serviços
+- **Exchange**: `saga.events` (fanout)
+- **Queues**:
+  - `pagamento.events` - Eventos para o serviço de pagamento
+  - `entrega.events` - Eventos para o serviço de entrega
+  - `pedido.events` - Eventos para o serviço de pedido
+  - `pedido.compensation` - Eventos de compensação
+
+---
 
 ## **Fluxo do SAGA (com Compensações)**
 Padrão coreografado: não há um orquestrador central. Cada serviço reage a eventos do Exchange `saga.events` publicados pelos demais.
@@ -49,127 +85,114 @@ Filas dedicadas (todas ligadas ao Exchange `fanout`):
 - Pagamento Service: `pagamento.events`
 - Entrega Service: `entrega.events`
 
+## Instruções de Execução
 
-
-
-
-## Como executar o projeto
-
-1. Clone o repositório:
-
-   Você pode clonar o projeto de duas formas:
-   * Via HTTPS:
-     ```cmd
-     git clone https://github.com/dev-corporativos/saga.git
-     ```
-   * Via SSH:
-     ```cmd
-     git clone git@github.com:dev-corporativos/saga.git
-     ```
-     
-2. Acesse a pasta do projeto
-   ```cmd
-   cd saga
-   ```
-3. Certifique-se de ter Docker + Docker Compose instalados.
-
-4. Rode o contêiner na sua máquina:
-   ```cmd
-   docker compose up
-   ```
-
-   *Caso deseje rodar em segundo plano, insira a tag `-d`*:
-   ```cmd
-   docker compose up -d
-   ```
-
-
-
-
-## Como acessar o endpoint:
-1. Você pode testar usando:
+Você pode testar usando:
 
    - Insomnia
    - Postman
    - Thunder Client
+   - Curl
 
-3. Criar um pedido
+### Pré-requisitos
 
-Use qualquer cliente HTTP para enviar:
-- Método: `POST`
-- URL: `http://localhost:3001/pedidos`
-- Body (JSON):
-```json
-{
-  "produto": "Notebook",
-  "quantidade": 1,
-  "valor": 4500
-}
+- **Docker** e **Docker Compose** instalados
+- **Node.js** 18+ (para desenvolvimento local)
+- Portas disponíveis: 3001, 3002, 3003, 5672, 15672, 5433, 5434, 5435
+
+### Executando o Projeto
+
+#### 1. Clone o repositório
+```bash
+git clone https://github.com/dev-corporativos/saga.git
+cd saga
 ```
-Resposta esperada (JSON):
+
+#### 2. Inicie todos os serviços com Docker Compose
+```bash
+docker-compose up --build
+```
+
+Este comando irá:
+- Criar e iniciar todos os containers
+- Configurar as redes e volumes
+- Inicializar os bancos de dados PostgreSQL
+- Configurar o RabbitMQ
+- Iniciar os 3 microserviços
+
+#### 3. Verifique se os serviços estão rodando
+
+Aguarde até ver as mensagens de inicialização:
+```
+[Pedido Service] Servidor rodando na porta 3001
+[Pagamento Service] Servidor rodando na porta 3002
+[Entrega Service] Servidor rodando na porta 3003
+```
+
+#### 4. Acesse a interface de gerenciamento do RabbitMQ
+
+Abra no navegador: http://localhost:15672
+- **Usuário**: guest
+- **Senha**: guest
+
+Aqui você pode monitorar:
+- Exchanges criados
+- Filas e suas mensagens
+- Conexões ativas
+- Taxa de mensagens
+
+### Testando o Sistema
+
+#### Criar um Pedido
+```bash
+curl -X POST http://localhost:3001/pedidos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "produto": "Notebook Dell",
+    "quantidade": 1,
+    "valor": 3500.00
+  }'
+```
+
+**Resposta esperada:**
 ```json
 {
-  "pedidoId": "<uuid>",
+  "pedidoId": "uuid-gerado",
   "status": "PENDENTE",
   "message": "[Pedido Service] Pedido criado com sucesso."
 }
 ```
 
-4. Consultar pagamento e entrega
-
-- Pagamento Service: `GET http://localhost:3002/pagamentos/<pedidoId>`
-- Entrega Service: `GET http://localhost:3003/entregas/<pedidoId>`
-
-5. Consultar pedidos
-
-- Pedido Service: `GET http://localhost:3001/pedidos`
-
-Coleções de exemplo (Postman): importe este JSON em Postman para ter os 3 requests prontos.
-
-```json
-{
-  "info": {
-    "name": "Saga Demo",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Criar Pedido",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": { "raw": "http://localhost:3001/pedidos", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["pedidos"] },
-        "body": { "mode": "raw", "raw": "{\n  \"produto\": \"Notebook\",\n  \"quantidade\": 1,\n  \"valor\": 4500\n}" }
-      }
-    },
-    {
-      "name": "Consultar Pagamento",
-      "request": {
-        "method": "GET",
-        "url": { "raw": "http://localhost:3002/pagamentos/{{pedidoId}}", "protocol": "http", "host": ["localhost"], "port": "3002", "path": ["pagamentos", "{{pedidoId}}"] }
-      }
-    },
-    {
-      "name": "Consultar Entrega",
-      "request": {
-        "method": "GET",
-        "url": { "raw": "http://localhost:3003/entregas/{{pedidoId}}", "protocol": "http", "host": ["localhost"], "port": "3003", "path": ["entregas", "{{pedidoId}}"] }
-      }
-    },
-    {
-      "name": "Listar Pedidos",
-      "request": {
-        "method": "GET",
-        "url": { "raw": "http://localhost:3001/pedidos", "protocol": "http", "host": ["localhost"], "port": "3001", "path": ["pedidos"] }
-      }
-    }
-  ],
-  "variable": [
-    { "key": "pedidoId", "value": "<preencha pelo retorno de Criar Pedido>" }
-  ]
-}
+#### Listar Todos os Pedidos
+```bash
+curl http://localhost:3001/pedidos
 ```
 
+#### Monitorar os Logs
+
+Acompanhe o fluxo do SAGA em tempo real:
+```bash
+docker-compose logs -f pedido-service pagamento-service entrega-service
+```
+
+Você verá logs como:
+```
+pedido-service      | [Pedido Service] Evento publicado: { type: 'PedidoCriado', ... }
+pagamento-service   | [Pagamento Service] Evento de pedido recebido: ...
+pagamento-service   | [Pagamento Service] Pagamento aprovado para o pedido ...
+entrega-service     | [Entrega Service] Evento de pagamento concluído recebido: ...
+```
+
+### Parando os Serviços
+
+```bash
+docker-compose down
+```
+
+Para remover também os volumes (dados dos bancos):
+```bash
+docker-compose down -v
+```
 
 ## **Tecnologias Utilizadas**
 - **Linguagem/Runtime:** Node.js, TypeScript 
@@ -185,3 +208,4 @@ Coleções de exemplo (Postman): importe este JSON em Postman para ter os 3 requ
 | [Jardson Alan](https://github.com/jardsonalan) | 20241038060006 |
 | [Ian Galvão](https://github.com/Barr0ca) | 20241038060011 |
 | [José Lucas](https://github.com/uluscaz-ifrn) | 20241038060003 |
+
