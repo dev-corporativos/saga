@@ -1,78 +1,90 @@
-import { getChannel } from "../messaging/rabbitmq";
-import { updateEntregaStatus, createEntrega } from "../services/entrega.service";
-import { v4 as uuidv4 } from "uuid";
+import { getChannel } from "../messaging/rabbitmq"
+import { createEntrega, updateEntregaStatus } from "../services/entrega.service"
+import { v4 as uuidv4 } from 'uuid'
 
-const pedidosProcessados = new Set<string>();
-export const listenToPedidoEvents = async (): Promise<void> => {
-    await getChannel().consume("entrega.events", async (msg: any) => {
-        if (!msg) return;
+let pedidosProcessados = new Set<string>()
 
-        try {
-            const event = JSON.parse(msg.content.toString());
-            if(event.type === "PagamentoRealizado"){
-                console.log("[Entrega Service] Evento recebido:", event);
+export const listenToPagamentoEvents = async (): Promise<void> => {
+  await getChannel().consume('entrega.events', async (msg: any) => {
+    if (!msg) return
 
-                if(pedidosProcessados.has(event.pedidoId)){
-                    console.log(`[Entrega Service] Pedido ${event.pedidoId} já processado, ignorando.`);getChannel().ack(msg);return;
-                }
-                
-                pedidosProcessados.add(event.pedidoId);
-                const entregaId = uuidv4();
+    try {
+      const event = JSON.parse(msg.content.toString())
+      const eventKey = `${event.type}-${event.pedidoId}`
 
-                await createEntrega({
-                id: entregaId,
-                pedido_id: event.pedidoId,
-                status: "PENDENTE",
-                })
+      if (pedidosProcessados.has(eventKey)) {
+        console.log(`[Entrega Service] Evento ${eventKey} já processado, ignorando.`)
+        getChannel().ack(msg)
+        return
+      }
 
-                const sucessoEntrega = Math.random() > 0.1;
-                if (sucessoEntrega){
-                    // Simular envio do pedido
-                    console.log(`[Entrega Service] Enviando pedido`);
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Simular envio de email
-                    // Atualizar status da entrega
-                    await updateEntregaStatus(entregaId, 'ENVIADA');
+      if (event.type === 'PagamentoConcluido' && event.status === 'CONCLUIDO') {
+        console.log('[Entrega Service] Evento de pagamento concluído recebido:', event)
+        pedidosProcessados.add(eventKey)
 
-                    // Simular pedido entregue
-                    console.log(`[Entrega Service] Pedido sendo entregue`);
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    // Atualizar status da entrega
-                    await updateEntregaStatus(entregaId, 'ENTREGUE');
-                    console.log(`[Entrega Service] Pedido entregue ${event.pedidoId}`);
-                    // Publicar evento de entrega
-                    await publishEvent({
-                        type: "PedidoEntregue",
-                        entregaId,
-                        pedidoId: event.pedidoId,
-                        status: "ENTREGUE",
-                        timestamp: new Date().toISOString(),
-                    });
-                }
-                else{
-                    await updateEntregaStatus(entregaId, "CANCELADA")
-                    console.log(`[Entrega Service] Entrega ${entregaId} cancelada do pedido ${event.pedidoId}.`);
+        const entregaId = uuidv4()
 
-                    await publishEvent({
-                        type: "EntregaCancelada",
-                        entregaId,
-                        pedidoId: event.pedidoId,
-                        status: "CANCELADA",
-                        timestamp: new Date().toISOString(),
-                    });
-                }
-            }
-            getChannel().ack(msg);
-        } catch (error) {
-            console.error("[Entrega Service] Erro ao publicar evento:", error);
-        }
-    })
+        await createEntrega({
+          id: entregaId,
+          pedidoId: event.pedidoId,
+          status: 'PENDENTE',
+        })
+
+        console.log(`[Entrega Service] Enviando pedido ${event.pedidoId}.`)
+
+        await updateEntregaStatus(entregaId, 'ENVIADO')
+        console.log(`[Entrega Service] Entrega ${entregaId} atualizada para ENVIADO.`)
+
+        await publishEvent({
+          type: 'EntregaConcluida',
+          entregaId: entregaId,
+          pedidoId: event.pedidoId,
+          status: 'ENTREGUE',
+          timestamp: new Date().toISOString(),
+        })
+      } else if (event.type === 'PagamentoCancelado' && event.status === 'CANCELADO') {
+        console.log('[Entrega Service] Evento de pagamento cancelado recebido:', event)
+        pedidosProcessados.add(eventKey)
+
+        const entregaId = uuidv4()
+
+        await createEntrega({
+          id: entregaId,
+          pedidoId: event.pedidoId,
+          status: 'PENDENTE',
+        })
+
+        console.log(`[Entrega Service] Entrega cancelada para o pedido ${event.pedidoId}.`)
+
+        await updateEntregaStatus(entregaId, 'CANCELADO')
+        console.log(`[Entrega Service] Entrega ${entregaId} atualizada para CANCELADO.`)
+
+        await publishEvent({
+          type: 'EntregaCancelada',
+          entregaId: entregaId,
+          pedidoId: event.pedidoId,
+          status: 'CANCELADO',
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      getChannel().ack(msg)
+    } catch (error) {
+      console.error('[Entrega Service] Erro ao processar evento de pagamento:', error)
+      getChannel().nack(msg, false, true)
+    }
+  })
 }
 
 export const publishEvent = async (event: any): Promise<void> => {
   try {
-    getChannel().publish("saga.events", "", Buffer.from(JSON.stringify(event)));
-    console.log("[Entrega Service] Evento publicado:", event);
+    getChannel().publish(
+      'saga.events',
+      '',
+      Buffer.from(JSON.stringify(event)),
+    )
+    console.log('[Entrega Service] Evento publicado:', event)
   } catch (error) {
-    console.error("[Entrega Service] Erro ao publicar evento:", error);
+    console.error('[Entrega Service] Erro ao publicar evento:', error)
   }
-};
+}
