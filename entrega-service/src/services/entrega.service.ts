@@ -2,8 +2,8 @@ import { pool } from "../database";
 
 export interface Entrega {
   id: string;
-  pedido_id: string;
-  status: 'PENDENTE' | 'ENVIADA' | 'ENTREGUE' | 'CANCELADA';
+  pedidoId: string;
+  status: 'PENDENTE' | 'ENTREGUE' | 'CANCELADO';
   created_at: Date;
   updated_at: Date;
 }
@@ -17,7 +17,7 @@ export const createEntrega = async (entrega: Omit<Entrega, 'created_at' | 'updat
 
   const result = await pool.query(query, [
     entrega.id,
-    entrega.pedido_id,
+    entrega.pedidoId,
     entrega.status,
   ])
 
@@ -54,7 +54,7 @@ export const getEntregaByPedidoId = async (pedidoId: string): Promise<Entrega | 
 
 const mapDbEntrega = (dbEntrega: any): Entrega => ({
   id: dbEntrega.id,
-  pedido_id: dbEntrega.pedido_id,
+  pedidoId: dbEntrega.pedido_id,
   status: dbEntrega.status,
   created_at: new Date(dbEntrega.created_at),
   updated_at: new Date(dbEntrega.updated_at),
