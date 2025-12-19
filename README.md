@@ -109,6 +109,7 @@ RESULTADO: Pedido ENTREGUE
 
 RESULTADO: Pedido CANCELADO (Compensação executada) 
 ```
+---
 
 ## Instruções de Execução
 
@@ -233,5 +234,6 @@ docker-compose down -v
 | [Jardson Alan](https://github.com/jardsonalan) | 20241038060006 |
 | [Ian Galvão](https://github.com/Barr0ca) | 20241038060011 |
 | [José Lucas](https://github.com/uluscaz-ifrn) | 20241038060003 |
+
 
 
