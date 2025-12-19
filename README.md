@@ -55,35 +55,60 @@ Este projeto demonstra uma arquitetura de microserviços utilizando o padrão SA
 ## **Fluxo do SAGA (com Compensações)**
 Padrão coreografado: não há um orquestrador central. Cada serviço reage a eventos do Exchange `saga.events` publicados pelos demais.
 
-- Passo 1 — Criação do Pedido
-  - Endpoint `POST /pedidos` (Pedido Service) cria registro com status `PENDENTE`.
-  - Publica evento `PedidoCriado` em `saga.events`.
+### Cenário 1: Fluxo de Sucesso (Pagamento Aprovado)
 
-- Passo 2 — Processamento do Pagamento
-  - Pagamento Service consome `PedidoCriado` na fila `pagamento.events` e cria um registro de pagamento `PENDENTE`.
-  - Simula aprovação com 80% de sucesso; publica `PagamentoConcluido` ou `PagamentoCancelado`.
+```
+1. Cliente → POST /pedidos
+   └─> [Pedido Service] Cria pedido com status PENDENTE
+       └─> Publica evento: PedidoCriado
+           │
+           ▼
+2. [Pagamento Service] Recebe PedidoCriado
+   └─> Cria pagamento com status PENDENTE
+       └─> Simula processamento (80% sucesso)
+           └─> Atualiza pagamento para CONCLUIDO
+               └─> Publica evento: PagamentoConcluido
+                   │
+                   ├──────────────────────────────────┐
+                   ▼                                  ▼
+3a. [Pedido Service]                    3b. [Entrega Service]
+    └─> Recebe PagamentoConcluido           └─> Recebe PagamentoConcluido
+        └─> Atualiza pedido                     └─> Cria entrega (PENDENTE)
+            para ENVIADO                            └─> Atualiza para ENVIADO
+                                                        └─> Publica: EntregaConcluida
+                                                            │
+                                                            ▼
+4. [Pedido Service] Recebe EntregaConcluida
+   └─> Atualiza pedido para ENTREGUE
 
-- Passo 3 — Entrega (sucesso ou compensação)
-  - Entrega Service consome `PagamentoConcluido`/`PagamentoCancelado` em `entrega.events`.
-    - Sucesso: cria entrega, atualiza para `ENVIADO`, publica `EntregaConcluida` com status `ENTREGUE`.
-    - Falha (compensação): cria entrega de controle e atualiza para `CANCELADO`, publica `EntregaCancelada`.
+RESULTADO: Pedido ENTREGUE 
+```
 
-- Passo 4 — Atualizações do Pedido
-  - Pedido Service consome:
-    - `PagamentoConcluido`/`PagamentoCancelado` em `pedido.compensation`:
-      - Sucesso: atualiza pedido para `ENVIADO` (aguardando confirmação da entrega).
-      - Falha: atualiza pedido para `CANCELADO` e publica `PedidoCancelado` (sinal de compensação).
-    - `EntregaConcluida` em `pedido.events`: atualiza pedido para `ENTREGUE` (estado final).
+### Cenário 2: Fluxo de Compensação (Pagamento Recusado) 
 
-Principais eventos no Exchange `saga.events`:
-- `PedidoCriado`, `PedidoCancelado`
-- `PagamentoConcluido`, `PagamentoCancelado`
-- `EntregaConcluida`, `EntregaCancelada`
+```
+1. Cliente → POST /pedidos
+   └─> [Pedido Service] Cria pedido com status PENDENTE
+       └─> Publica evento: PedidoCriado
+           │
+           ▼
+2. [Pagamento Service] Recebe PedidoCriado
+   └─> Cria pagamento com status PENDENTE
+       └─> Simula processamento (20% falha)
+           └─> Atualiza pagamento para CANCELADO
+               └─> Publica evento: PagamentoCancelado
+                   │
+                   ├──────────────────────────────────┐
+                   ▼                                  ▼
+3a. [Pedido Service]                    3b. [Entrega Service]
+    └─> Recebe PagamentoCancelado           └─> Recebe PagamentoCancelado
+        └─> COMPENSAÇÃO:                        └─> Cria entrega (PENDENTE)
+            Atualiza pedido                         └─> Atualiza para CANCELADO
+            para CANCELADO                              └─> Publica: EntregaCancelada
+            └─> Publica: PedidoCancelado
 
-Filas dedicadas (todas ligadas ao Exchange `fanout`):
-- Pedido Service: `pedido.events` e `pedido.compensation`
-- Pagamento Service: `pagamento.events`
-- Entrega Service: `entrega.events`
+RESULTADO: Pedido CANCELADO (Compensação executada) 
+```
 
 ## Instruções de Execução
 
@@ -208,4 +233,5 @@ docker-compose down -v
 | [Jardson Alan](https://github.com/jardsonalan) | 20241038060006 |
 | [Ian Galvão](https://github.com/Barr0ca) | 20241038060011 |
 | [José Lucas](https://github.com/uluscaz-ifrn) | 20241038060003 |
+
 
