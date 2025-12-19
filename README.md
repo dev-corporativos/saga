@@ -62,11 +62,11 @@ Filas dedicadas (todas ligadas ao Exchange `fanout`):
    Você pode clonar o projeto de duas formas:
    * Via HTTPS:
      ```cmd
-     git clone https://github.com/dev-corporativos/transaction-acid.git
+     git clone https://github.com/dev-corporativos/saga.git
      ```
    * Via SSH:
      ```cmd
-     git clone git@github.com:dev-corporativos/transaction-acid.git
+     git clone git@github.com:dev-corporativos/saga.git
      ```
      
 2. Acesse a pasta do projeto
