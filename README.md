@@ -193,6 +193,15 @@ curl -X POST http://localhost:3001/pedidos \
 ```bash
 curl http://localhost:3001/pedidos
 ```
+#### Listar Pagamento e Entrega
+- Pagamento Service:
+```bash
+curl http://localhost:3002/pagamentos/<pedidoId>
+```
+- Entrega Service:
+```bash
+curl http://localhost:3002/entregas/<pedidoId>
+```
 
 #### Monitorar os Logs
 
@@ -234,6 +243,7 @@ docker-compose down -v
 | [Jardson Alan](https://github.com/jardsonalan) | 20241038060006 |
 | [Ian Galvão](https://github.com/Barr0ca) | 20241038060011 |
 | [José Lucas](https://github.com/uluscaz-ifrn) | 20241038060003 |
+
 
 
 
