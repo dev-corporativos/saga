@@ -7,7 +7,7 @@ app.use(express.json());
 app.get("/entregas/:pedidoId", async (req: Request, res: Response) => {
   try {
     const { pedidoId } = req.params;
-    const entrega = await getEntregasByPedidoId(pedidoId);
+    const entrega = await getEntregaByPedidoId(pedidoId);
 
     if (!entrega) {
       return res.status(400).json({ error: '[Entrega Service] Entrega não encontrada.' })

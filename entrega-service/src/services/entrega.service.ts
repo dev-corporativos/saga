@@ -3,7 +3,7 @@ import { pool } from "../database";
 export interface Entrega {
   id: string;
   pedido_id: string;
-  status: 'PENDENTE' | 'ENVIADO' | 'ENTREGUE' | 'CANCELADO';
+  status: 'PENDENTE' | 'ENVIADA' | 'ENTREGUE' | 'CANCELADA';
   created_at: Date;
   updated_at: Date;
 }
@@ -41,7 +41,7 @@ export const updateEntregaStatus = async (entregaId: string, status: string): Pr
   return mapDbEntrega(result.rows[0])
 }
 
-export const getEntregasByPedidoId = async (pedidoId: string): Promise<Entrega | null> => {
+export const getEntregaByPedidoId = async (pedidoId: string): Promise<Entrega | null> => {
   const query = 'SELECT * FROM entrega WHERE pedido_id = $1;';
   const result = await pool.query(query, [pedidoId]);
 

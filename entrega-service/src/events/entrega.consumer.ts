@@ -1,72 +1,78 @@
-import { getChannel } from "../messaging/rabbitmq"
-import { updateEntregaStatus } from "../services/entrega.service"
+import { getChannel } from "../messaging/rabbitmq";
+import { updateEntregaStatus, createEntrega } from "../services/entrega.service";
+import { v4 as uuidv4 } from "uuid";
 
-export const listenToPagamentoEvents = async (): Promise<void> => {
-  await getChannel().consume('entrega.compensation', async (msg: any) => {
-    if (!msg) return
+const pedidosProcessados = new Set<string>();
+export const listenToPedidoEvents = async (): Promise<void> => {
+    await getChannel().consume("entrega.events", async (msg: any) => {
+        if (!msg) return;
 
-    try {
-      const event = JSON.parse(msg.content.toString())
+        try {
+            const event = JSON.parse(msg.content.toString());
+            if(event.type === "PagamentoRealizado"){
+                console.log("[Entrega Service] Evento recebido:", event);
 
-      if (event.type === 'PagamentoCancelado' || event.type === 'PagamentoConcluido') {
-        console.log('[Entrega Service] Evento de pagamento recebido:', event)
+                if(pedidosProcessados.has(event.pedidoId)){
+                    console.log(`[Entrega Service] Pedido ${event.pedidoId} já processado, ignorando.`);getChannel().ack(msg);return;
+                }
+                
+                pedidosProcessados.add(event.pedidoId);
+                const entregaId = uuidv4();
 
-        if (event.type === 'PagamentoCancelado') {
-          await updateEntregaStatus(event.entregaId, 'CANCELADO')
-          console.log(`[Entrega Service] Entrega ${event.entregaId} cancelada devido a falha no pagamento.`)
+                await createEntrega({
+                id: entregaId,
+                pedido_id: event.pedidoId,
+                status: "PENDENTE",
+                })
 
-          await publishEvent({
-            type: 'EntregaCancelada',
-            entregaId: event.entregaId,
-            timestamp: new Date().toISOString(),
-          })
-        } else if (event.type === 'PagamentoConcluido' && event.status === 'CONCLUIDO') {
-          await updateEntregaStatus(event.entregaId, 'ENVIADO')
-          console.log(`[Entrega Service] Entrega ${event.entregaId} atualizada para ENVIADO.`)
+                const sucessoEntrega = Math.random() > 0.1;
+                if (sucessoEntrega){
+                    // Simular envio do pedido
+                    console.log(`[Entrega Service] Enviando pedido`);
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Simular envio de email
+                    // Atualizar status da entrega
+                    await updateEntregaStatus(entregaId, 'ENVIADA');
+
+                    // Simular pedido entregue
+                    console.log(`[Entrega Service] Pedido sendo entregue`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // Atualizar status da entrega
+                    await updateEntregaStatus(entregaId, 'ENTREGUE');
+                    console.log(`[Entrega Service] Pedido entregue ${event.pedidoId}`);
+                    // Publicar evento de entrega
+                    await publishEvent({
+                        type: "PedidoEntregue",
+                        entregaId,
+                        pedidoId: event.pedidoId,
+                        status: "ENTREGUE",
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+                else{
+                    await updateEntregaStatus(entregaId, "CANCELADA")
+                    console.log(`[Entrega Service] Entrega ${entregaId} cancelada do pedido ${event.pedidoId}.`);
+
+                    await publishEvent({
+                        type: "EntregaCancelada",
+                        entregaId,
+                        pedidoId: event.pedidoId,
+                        status: "CANCELADA",
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+            }
+            getChannel().ack(msg);
+        } catch (error) {
+            console.error("[Entrega Service] Erro ao publicar evento:", error);
         }
-      }
-
-      getChannel().ack(msg)
-    } catch (error) {
-      console.error('[Entrega Service] Erro ao processar evento de pagamento:', error)
-      getChannel().nack(msg, false, true)
-    }
-  })
-}
-
-export const listenToEntregaEvents = async (): Promise<void> => {
-  await getChannel().consume('entrega.events', async (msg: any) => {
-    if (!msg) return
-
-    try {
-      const event = JSON.parse(msg.content.toString())
-
-      if (event.type === 'EntregaConcluida') {
-        console.log('[Entrega Service] Evento de entrega concluída:', event)
-
-        if (event.status === 'ENTREGUE') {
-          await updateEntregaStatus(event.entregaId, 'ENTREGUE')
-          console.log(`[Entrega Service] Entrega ${event.entregaId} atualizada para ENTREGUE.`)
-        }
-      }
-
-      getChannel().ack(msg)
-    } catch (error) {
-      console.error('[Entrega Service] Erro ao processar evento de entrega:', error)
-      getChannel().nack(msg, false, true)
-    }
-  })
+    })
 }
 
 export const publishEvent = async (event: any): Promise<void> => {
   try {
-    getChannel().publish(
-      'saga.events',
-      '',
-      Buffer.from(JSON.stringify(event)),
-    )
-    console.log('[Entrega Service] Evento publicado:', event)
+    getChannel().publish("saga.events", "", Buffer.from(JSON.stringify(event)));
+    console.log("[Entrega Service] Evento publicado:", event);
   } catch (error) {
-    console.error('[Entrega Service] Erro ao publicar evento:', error)
+    console.error("[Entrega Service] Erro ao publicar evento:", error);
   }
-}
+};
